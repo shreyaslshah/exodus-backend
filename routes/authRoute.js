@@ -4,8 +4,8 @@ const jwt = require('jsonwebtoken');
 const sessionstorage = require('sessionstorage');
 const nodemailer = require("nodemailer");
 const bcrypt = require('bcrypt');
-const { checkIsVerified, checkJWT } = require('../middleware/authMiddleware');
-const {verifyToken} = require('../middleware/usercheck');
+const { checkIsVerified } = require('../middleware/authMiddleware');
+const { verifyToken } = require('../middleware/usercheck');
 const constructTemplate = require('../utils/emailTemplate');
 
 const router = Router();
@@ -56,16 +56,16 @@ const createToken = (id) => {
 
 /* *********************************************************** */
 
-router.get('/', checkIsVerified,verifyToken, async (req, res) => {
-  try{
-    const user = await User.findOne({_id:req.userId});
-    if(!user){
-      return res.status(404).json({'err':'User not found'});
+router.get('/', checkIsVerified, verifyToken, async (req, res) => {
+  try {
+    const user = await User.findOne({ _id: req.userId });
+    if (!user) {
+      return res.status(404).json({ 'err': 'User not found' });
     }
     res.json(user);
   }
-  catch(err){
-    return res.status(500).json({'err':err.toString()});
+  catch (err) {
+    return res.status(500).json({ 'err': err.toString() });
   }
 })
 
@@ -78,7 +78,7 @@ router.get('/signup', (req, res) => {
 /* *********************************************************** */
 
 router.post('/signup', async (req, res) => {
-  const { name, email, password,college,phoneno } = req.body;
+  const { name, email, password, college, phoneno } = req.body;
 
   try {
     const user = await User.create({
@@ -89,28 +89,33 @@ router.post('/signup', async (req, res) => {
       phoneno,
       isVerified: false
     });
-    if(!user){
-      return res.status(400).json({'msg':'Counld not create user'});
+    if (!user) {
+      return res.status(400).json({ 'msg': 'Could not create user' });
     }
     const token = createToken(user._id);
     sessionstorage.setItem('jwt', token);
 
     var transporter = nodemailer.createTransport({
-      service: "gmail",
-      secure:true,
+      host: "smtp-mail.outlook.com", // hostname
+      secureConnection: false, // TLS requires secureConnection to be false
+      port: 587, // port for secure SMTP
       auth: {
-        user: process.env.NODE_MAIL_USER,
-        pass: process.env.NODE_MAIL_PASS
+        user: "arshiaputhran@outlook.com",
+        pass: "aditya12"
+      },
+      tls: {
+        ciphers: 'SSLv3'
       }
     });
-    const message = constructTemplate(name,"https://exodus.ieeemanipal.com/verification/"+token,email);
+
+    const message = constructTemplate(name, `http://${req.headers.host}/api/auth/verify-email?uid=${user._id}&token=` + token, email);
     const options = {
-      from: process.env.NODE_MAIL_USER,
+      from: "arshiaputhran@outlook.com",
       to: email,
       subject: 'Email verification',
       text: `Go to this link: `,
       // html: `<a href='http://${req.headers.host}/api/auth/verify-email?uid=${user._id}'>click to verify</a>`
-      html : message
+      html: message
     }
 
     transporter.sendMail(options, function (err, info) {
@@ -126,16 +131,17 @@ router.post('/signup', async (req, res) => {
   }
 
   catch (error) {
+    console.log(error);
     let errorMessage = handleErrors(error);
     console.log(errorMessage);
-    res.status(400).json({ errorMessage,'err':error.toString() });
+    res.status(400).json({ errorMessage, 'err': error.toString() });
   }
 
 })
 
 /* *********************************************************** */
 
-router.get('/verify-email',verifyToken, async (req, res) => {
+router.get('/verify-email', verifyToken, async (req, res) => {
   try {
     //req.query.uid
     console.log(req.userId);
@@ -163,14 +169,14 @@ router.get('/login', (req, res) => {
 
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
-  console.log(email," ",password);
+  console.log(email, " ", password);
 
   try {
     const user = await User.login(email, password);
     const token = createToken(user._id);
     sessionstorage.setItem('jwt', token);
 
-    res.status(200).json({ user,token });
+    res.status(200).json({ user, token });
   }
   catch (error) {
     let errorMessage = handleErrors(error);
@@ -193,15 +199,20 @@ router.post('/forgot-password', async (req, res) => {
   }
 
   var transporter = nodemailer.createTransport({
-    service: "hotmail",
+    host: "smtp-mail.outlook.com", // hostname
+    secureConnection: false, // TLS requires secureConnection to be false
+    port: 587, // port for secure SMTP
     auth: {
-      user: process.env.NODE_MAIL_USER,
-      pass: process.env.NODE_MAIL_PASS
+      user: "arshiaputhran@outlook.com",
+      pass: "aditya12"
+    },
+    tls: {
+      ciphers: 'SSLv3'
     }
   });
 
   const options = {
-    from: process.env.NODE_MAIL_USER,
+    from: "arshiaputhran@outlook.com",
     to: email,
     subject: 'password reset link',
     text: `go to this link: `,
@@ -234,7 +245,7 @@ router.post('/reset-password', async (req, res) => {
       .then(console.log('password has been updated'));
   } catch (error) {
     console.log(error);
-    res.status(400).send({'err':error.toString()});
+    res.status(400).send({ 'err': error.toString() });
     return;
   }
 
